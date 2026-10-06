@@ -1,0 +1,186 @@
+import requests
+import pandas as pd
+from datetime import datetime
+
+# ============================================================
+# DASHBOARD MACROECONÔMICO - BRASIL
+# Versão 1.0
+#
+# Fontes:
+# Banco Central do Brasil - SGS
+# IBGE - Indicadores/SIDRA
+# ============================================================
+
+
+# ------------------------------------------------------------
+# FUNÇÃO PARA CONSULTAR O SGS DO BANCO CENTRAL
+# ------------------------------------------------------------
+
+def consultar_bcb(codigo, ultimos=1):
+
+    url = (
+        f"https://api.bcb.gov.br/dados/serie/"
+        f"bcdata.sgs.{codigo}/dados/ultimos/{ultimos}"
+        f"?formato=json"
+    )
+
+    try:
+        resposta = requests.get(url, timeout=15)
+        resposta.raise_for_status()
+
+        dados = resposta.json()
+
+        if not dados:
+            return None
+
+        ultimo = dados[-1]
+
+        return {
+            "data": ultimo["data"],
+            "valor": float(ultimo["valor"].replace(",", "."))
+        }
+
+    except Exception as erro:
+        print(f"Erro ao consultar série {codigo}: {erro}")
+        return None
+
+
+# ============================================================
+# INDICADORES
+# ============================================================
+
+indicadores = {
+
+    "Selic": {
+        "fonte": "Banco Central",
+        "codigo": 1178,
+        "unidade": "%"
+    },
+
+    "IPCA": {
+        "fonte": "Banco Central / IBGE",
+        "codigo": 433,
+        "unidade": "%"
+    },
+
+    "Dólar": {
+        "fonte": "Banco Central",
+        "codigo": 1,
+        "unidade": "R$/US$"
+    },
+
+    "PIB": {
+        "fonte": "IBGE",
+        "codigo": None,
+        "unidade": "%"
+    },
+
+    "Desemprego": {
+        "fonte": "IBGE",
+        "codigo": None,
+        "unidade": "%"
+    },
+
+    "IBC-Br": {
+        "fonte": "Banco Central",
+        "codigo": 24363,
+        "unidade": "índice"
+    },
+
+    "Produção Industrial": {
+        "fonte": "IBGE",
+        "codigo": None,
+        "unidade": "%"
+    },
+
+    "Dívida Bruta / PIB": {
+        "fonte": "Banco Central",
+        "codigo": None,
+        "unidade": "% do PIB"
+    },
+
+    "Resultado Primário": {
+        "fonte": "Banco Central",
+        "codigo": None,
+        "unidade": "R$ bilhões"
+    },
+
+    "Reservas Internacionais": {
+        "fonte": "Banco Central",
+        "codigo": None,
+        "unidade": "US$ bilhões"
+    }
+}
+
+
+# ============================================================
+# CONSULTA DOS INDICADORES DISPONÍVEIS NO SGS
+# ============================================================
+
+resultados = []
+
+for nome, info in indicadores.items():
+
+    if info["codigo"] is not None:
+
+        resultado = consultar_bcb(info["codigo"])
+
+        if resultado:
+
+            resultados.append({
+                "Indicador": nome,
+                "Valor": resultado["valor"],
+                "Unidade": info["unidade"],
+                "Data": resultado["data"],
+                "Fonte": info["fonte"]
+            })
+
+        else:
+
+            resultados.append({
+                "Indicador": nome,
+                "Valor": None,
+                "Unidade": info["unidade"],
+                "Data": None,
+                "Fonte": info["fonte"]
+            })
+
+    else:
+
+        resultados.append({
+            "Indicador": nome,
+            "Valor": None,
+            "Unidade": info["unidade"],
+            "Data": None,
+            "Fonte": info["fonte"]
+        })
+
+
+# ============================================================
+# TRANSFORMAR EM DATAFRAME
+# ============================================================
+
+df = pd.DataFrame(resultados)
+
+
+# ============================================================
+# IMPRESSÃO
+# ============================================================
+
+print("\n" + "=" * 75)
+print("          DASHBOARD MACROECONÔMICO — BRASIL")
+print("=" * 75)
+
+print(
+    df.to_string(
+        index=False,
+        justify="left"
+    )
+)
+
+print("=" * 75)
+print(
+    f"Atualizado em: "
+    f"{datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
+)
+print("=" * 75)
